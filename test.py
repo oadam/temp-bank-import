@@ -2,7 +2,7 @@ from unicodecsv import DictReader
 from datetime import datetime
 from whoosh.filedb.filestore import RamStorage
 from whoosh.fields import TEXT, ID, NUMERIC, Schema
-from whoosh.query import Term, Or
+from whoosh.query import FuzzyTerm, Term, Or
 from collections import Counter
 import re
 
@@ -49,8 +49,8 @@ tenant_ix = tenant_storage.create_index(tenant_schema)
 tenant_writer = tenant_ix.writer()
 for i in range(0, len(known_tenants)):
     ten = known_tenants[i]
-    for w in ten.split():
-        tenant_writer.add_document(id=i, name=w.lower())
+   # for w in ten.split():
+    tenant_writer.add_document(id=i, name=ten)
 tenant_writer.commit()
 
 #import_writer = import_ix.writer()
@@ -64,11 +64,10 @@ tenant_writer.commit()
 end_result = []
 with tenant_ix.searcher() as searcher:
     for toto in to_test:
-        result = searcher.search(Or([Term("name", t.lower()) for t in re.split('\W+', toto['name'])]))
-        commons = Counter([r["id"] for r in result]).most_common()
-        matches = [(known_tenants[c[0]], c[1]) for c in commons]
-        end_result.append((toto["name"], matches))
+        result = searcher.search(Or([FuzzyTerm("name", t.lower()) for t in re.split('\W+', toto['name'])]))
+        matches = [{"tenant": known_tenants[r["id"]], "score":r.score} for r in result]
+        end_result.append({"import": toto["name"], "matches": matches})
 
-print("\n".join(sorted([unicode(r) for r in end_result if len(r[1]) == 0 or r[1][0][1] <= 1], key=lambda x : x[0] )))
-
+s = sorted(end_result, key=lambda r: 0 if len(r["matches"]) == 0 else r["matches"][0]["score"])
+print("\n".join(map(unicode, s)))
 
