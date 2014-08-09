@@ -4,6 +4,7 @@ from whoosh.filedb.filestore import RamStorage
 from whoosh.fields import TEXT, ID, NUMERIC, Schema
 from whoosh.query import Term, Or
 from collections import Counter
+import re
 
 f = open('final.csv', 'r')
 r = DictReader(f)
@@ -49,7 +50,7 @@ tenant_writer = tenant_ix.writer()
 for i in range(0, len(known_tenants)):
     ten = known_tenants[i]
     for w in ten.split():
-        tenant_writer.add_document(id=i, name=w)
+        tenant_writer.add_document(id=i, name=w.lower())
 tenant_writer.commit()
 
 #import_writer = import_ix.writer()
@@ -60,11 +61,14 @@ tenant_writer.commit()
         #amount=t["amount"])
 #import_writer.commit()
 
+end_result = []
 with tenant_ix.searcher() as searcher:
     for toto in to_test:
-        result = searcher.search(Or([Term("name", t.lower()) for t in toto['name'].split()]))
+        result = searcher.search(Or([Term("name", t.lower()) for t in re.split('\W+', toto['name'])]))
         commons = Counter([r["id"] for r in result]).most_common()
         matches = [(known_tenants[c[0]], c[1]) for c in commons]
-        print(toto["name"], "->", matches)
+        end_result.append((toto["name"], matches))
+
+print("\n".join(sorted([unicode(r) for r in end_result if len(r[1]) == 0 or r[1][0][1] <= 1], key=lambda x : x[0] )))
 
 
